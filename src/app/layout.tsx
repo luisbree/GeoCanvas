@@ -1,10 +1,24 @@
-import type {Metadata} from 'next';
-import { Toaster } from "@/components/ui/toaster";
+
+import type { Metadata } from 'next';
+import { Encode_Sans, Encode_Sans_Condensed } from 'next/font/google';
 import './globals.css';
+import { Toaster } from '@/components/ui/toaster';
+
+const encodeSans = Encode_Sans({
+  subsets: ['latin'],
+  variable: '--font-encode-sans',
+});
+
+const encodeSansCondensed = Encode_Sans_Condensed({
+  subsets: ['latin'],
+  weight: '500',
+  variable: '--font-encode-sans-condensed',
+});
+
 
 export const metadata: Metadata = {
-  title: 'GeoCanvas',
-  description: 'An interactive map viewer built with Next.js and OpenLayers.',
+  title: 'Map Explorer',
+  description: 'Explore the world with an interactive map.',
 };
 
 export default function RootLayout({
@@ -13,13 +27,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-      </head>
-      <body className="font-body antialiased h-full bg-background">
+    <html lang="en">
+      <body
+        className={`${encodeSans.variable} ${encodeSansCondensed.variable} antialiased`}
+      >
         {children}
         <Toaster />
       </body>
