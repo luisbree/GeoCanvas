@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { MapPin, Database, Wrench, ListTree, ListChecks, Sparkles, ClipboardCheck, Library, LifeBuoy, Printer, Server, BrainCircuit } from 'lucide-react';
+import { MapPin, Database, Wrench, ListTree, ListChecks, Sparkles, ClipboardCheck, Library, LifeBuoy, Printer, Server, BrainCircuit, LogOut } from 'lucide-react';
 import { Style, Fill, Stroke, Circle as CircleStyle } from 'ol/style';
 import { transformExtent } from 'ol/proj';
 import type { Extent } from 'ol/extent';
@@ -39,6 +39,7 @@ import { useFloatingPanels } from '@/hooks/panels/useFloatingPanels';
 import { useMapCapture, type MapCaptureData } from '@/hooks/map-tools/useMapCapture';
 import { useWfsLibrary } from '@/hooks/wfs-library/useWfsLibrary';
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 import type { OSMCategoryConfig, GeoServerDiscoveredLayer, BaseLayerOptionForSelect, MapLayer, ChatMessage, BaseLayerSettings } from '@/lib/types';
 import { chatWithMapAssistant, type MapAssistantOutput } from '@/ai/flows/find-layer-flow';
@@ -138,6 +139,7 @@ export default function GeoMapperClient() {
 
   const { mapRef, mapElementRef, setMapInstanceAndElement, isMapReady, drawingSourceRef } = useOpenLayersMap();
   const { toast } = useToast();
+  const { user, signOut } = useAuth();
 
   const { panels, handlePanelMouseDown, togglePanelCollapse, togglePanelMinimize } = useFloatingPanels({
     layersPanelRef,
@@ -543,45 +545,75 @@ export default function GeoMapperClient() {
           <MapPin className="mr-2 h-6 w-6 text-primary" />
           <h1 className="text-xl font-semibold">Departamento de Estudios Ambientales y Sociales</h1>
         </div>
-        <div className="flex flex-row space-x-1">
-          <TooltipProvider delayDuration={200}>
-            {panelToggleConfigs.map((panelConfig) => {
-              const panelState = panels[panelConfig.id as keyof typeof panels];
-              if (!panelState) return null;
+        <div className="flex items-center space-x-2">
+            <div className="flex flex-row space-x-1">
+                <TooltipProvider delayDuration={200}>
+                    {panelToggleConfigs.map((panelConfig) => {
+                    const panelState = panels[panelConfig.id as keyof typeof panels];
+                    if (!panelState) return null;
 
-              const isPanelOpen = !panelState.isMinimized;
-              const tooltipText = panelConfig.name;
-              
-              return (
-                <Tooltip key={panelConfig.id}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      size="icon"
-                      className={`h-8 w-8 focus-visible:ring-primary ${
-                        isPanelOpen
-                          ? 'bg-primary text-primary-foreground hover:bg-primary/90 border-primary/80'
-                          : 'bg-gray-700/80 text-white hover:bg-gray-600/90 border-gray-600/70'
-                      }`}
-                      onClick={() => {
-                        if (panelConfig.id === 'printComposer') {
-                          handleTogglePrintComposer();
-                        } else {
-                          togglePanelMinimize(panelConfig.id as any);
-                        }
-                      }}
-                      aria-label={tooltipText}
-                    >
-                      <panelConfig.IconComponent className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="bg-gray-700 text-white border-gray-600">
-                    <p className="text-xs">{tooltipText}</p>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })}
-          </TooltipProvider>
+                    const isPanelOpen = !panelState.isMinimized;
+                    const tooltipText = panelConfig.name;
+                    
+                    return (
+                        <Tooltip key={panelConfig.id}>
+                        <TooltipTrigger asChild>
+                            <Button
+                            variant={"outline"}
+                            size="icon"
+                            className={`h-8 w-8 focus-visible:ring-primary ${
+                                isPanelOpen
+                                ? 'bg-primary text-primary-foreground hover:bg-primary/90 border-primary/80'
+                                : 'bg-gray-700/80 text-white hover:bg-gray-600/90 border-gray-600/70'
+                            }`}
+                            onClick={() => {
+                                if (panelConfig.id === 'printComposer') {
+                                handleTogglePrintComposer();
+                                } else {
+                                togglePanelMinimize(panelConfig.id as any);
+                                }
+                            }}
+                            aria-label={tooltipText}
+                            >
+                            <panelConfig.IconComponent className="h-4 w-4" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="bg-gray-700 text-white border-gray-600">
+                            <p className="text-xs">{tooltipText}</p>
+                        </TooltipContent>
+                        </Tooltip>
+                    );
+                    })}
+                </TooltipProvider>
+            </div>
+            
+            <div className="flex items-center space-x-2 pl-2 border-l border-gray-600">
+                {user && (
+                    <>
+                        {user.photoURL && (
+                            <img src={user.photoURL} alt={user.displayName || 'User'} className="h-7 w-7 rounded-full" />
+                        )}
+                        <span className="text-xs font-medium hidden sm:inline">{user.displayName}</span>
+                        <TooltipProvider delayDuration={200}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8 bg-red-700/30 hover:bg-red-600/50 border-red-500/50 text-white/90"
+                                        onClick={signOut}
+                                    >
+                                        <LogOut className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="bg-gray-700 text-white border-gray-600">
+                                    <p className="text-xs">Cerrar sesión</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </>
+                )}
+            </div>
         </div>
       </header>
       <div ref={mapAreaRef} className="relative flex-1 overflow-visible">
