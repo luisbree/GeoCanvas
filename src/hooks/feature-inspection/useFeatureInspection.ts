@@ -17,6 +17,7 @@ interface UseFeatureInspectionProps {
   mapElementRef: React.RefObject<HTMLDivElement | null>;
   isMapReady: boolean;
   onNewSelection: () => void;
+  isInteractionAllowed: boolean;
 }
 
 const highlightStyle = new Style({
@@ -40,6 +41,7 @@ export const useFeatureInspection = ({
   mapElementRef,
   isMapReady,
   onNewSelection,
+  isInteractionAllowed,
 }: UseFeatureInspectionProps) => {
   const { toast } = useToast();
   const [isInspectModeActive, setIsInspectModeActive] = useState(false);
@@ -58,6 +60,8 @@ export const useFeatureInspection = ({
 
 
   const processAndDisplayFeatures = useCallback((features: Feature<Geometry>[], layerName: string) => {
+    if (!isInteractionAllowed) return;
+
     if (features.length === 0) {
       setSelectedFeatureAttributes(null);
       setCurrentInspectedLayerName(null);
@@ -80,7 +84,7 @@ export const useFeatureInspection = ({
     }
     
     onNewSelectionRef.current();
-  }, [toast, onNewSelectionRef]);
+  }, [isInteractionAllowed, toast, onNewSelectionRef]);
   
   const clearSelection = useCallback(() => {
     if (selectInteractionRef.current) {
@@ -92,6 +96,11 @@ export const useFeatureInspection = ({
   }, []);
 
   const toggleInspectMode = useCallback(() => {
+    if (!isInteractionAllowed) {
+        toast({ description: 'Debe iniciar sesión para usar las herramientas de inspección.', variant: 'destructive' });
+        return;
+    }
+
     const nextState = !isInspectModeActive;
     setIsInspectModeActive(nextState);
 
@@ -105,7 +114,7 @@ export const useFeatureInspection = ({
         setSelectionModeInternal('click'); // Default to inspect mode when activated
         toast({ description: 'Modo Inspección activado. Haga clic o arrastre para ver atributos.' });
     }
-  }, [isInspectModeActive, mapElementRef, toast, clearSelection]);
+  }, [isInspectModeActive, mapElementRef, toast, clearSelection, isInteractionAllowed]);
 
   const setSelectionMode = useCallback((mode: 'click' | 'box') => {
     setSelectionModeInternal(mode);
@@ -128,7 +137,7 @@ export const useFeatureInspection = ({
     dragBoxInteractionRef.current = null;
     if (mapElementRef.current) mapElementRef.current.style.cursor = 'default';
 
-    if (isInspectModeActive) {
+    if (isInspectModeActive && isInteractionAllowed) {
       if (mapElementRef.current) {
          mapElementRef.current.style.cursor = selectionMode === 'click' ? 'help' : 'crosshair';
       }
@@ -200,7 +209,7 @@ export const useFeatureInspection = ({
         if (dragBoxInteractionRef.current) map.removeInteraction(dragBoxInteractionRef.current);
       }
     };
-  }, [isInspectModeActive, selectionMode, isMapReady, mapRef, mapElementRef, processAndDisplayFeatures, toast]);
+  }, [isInspectModeActive, selectionMode, isMapReady, mapRef, mapElementRef, processAndDisplayFeatures, toast, isInteractionAllowed]);
 
   return {
     isInspectModeActive,

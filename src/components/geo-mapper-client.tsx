@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { MapPin, Database, Wrench, ListTree, ListChecks, Sparkles, ClipboardCheck, Library, LifeBuoy, Printer, Server, BrainCircuit, LogOut } from 'lucide-react';
+import { MapPin, Database, Wrench, ListTree, ListChecks, Sparkles, ClipboardCheck, Library, LifeBuoy, Printer, Server, BrainCircuit, LogIn, LogOut } from 'lucide-react';
 import { Style, Fill, Stroke, Circle as CircleStyle } from 'ol/style';
 import { transformExtent } from 'ol/proj';
 import type { Extent } from 'ol/extent';
@@ -109,17 +109,17 @@ const PANEL_WIDTH = 350;
 const PANEL_PADDING = 8;
 
 const panelToggleConfigs = [
-  { id: 'legend', IconComponent: ListTree, name: "Capas en Mapa" },
-  { id: 'deasCatalog', IconComponent: Server, name: "Capas Predefinidas" },
-  { id: 'wfsLibrary', IconComponent: Library, name: "Biblioteca de Servidores" },
-  { id: 'layers', IconComponent: Database, name: "Datos y Vista" },
-  { id: 'tools', IconComponent: Wrench, name: "Herramientas" },
-  { id: 'trello', IconComponent: ClipboardCheck, name: "Trello" },
-  { id: 'attributes', IconComponent: ListChecks, name: "Atributos" },
-  { id: 'printComposer', IconComponent: Printer, name: "Impresión" },
-  { id: 'gee', IconComponent: BrainCircuit, name: "Procesamiento GEE" },
-  { id: 'ai', IconComponent: Sparkles, name: "Asistente IA" },
-  { id: 'help', IconComponent: LifeBuoy, name: "Ayuda" },
+  { id: 'legend', IconComponent: ListTree, name: "Capas en Mapa", auth: true },
+  { id: 'deasCatalog', IconComponent: Server, name: "Capas Predefinidas", auth: false },
+  { id: 'wfsLibrary', IconComponent: Library, name: "Biblioteca de Servidores", auth: true },
+  { id: 'layers', IconComponent: Database, name: "Datos y Vista", auth: false },
+  { id: 'tools', IconComponent: Wrench, name: "Herramientas", auth: true },
+  { id: 'trello', IconComponent: ClipboardCheck, name: "Trello", auth: true },
+  { id: 'attributes', IconComponent: ListChecks, name: "Atributos", auth: true },
+  { id: 'printComposer', IconComponent: Printer, name: "Impresión", auth: false },
+  { id: 'gee', IconComponent: BrainCircuit, name: "Procesamiento GEE", auth: true },
+  { id: 'ai', IconComponent: Sparkles, name: "Asistente IA", auth: true },
+  { id: 'help', IconComponent: LifeBuoy, name: "Ayuda", auth: false },
 ];
 
 
@@ -139,7 +139,7 @@ export default function GeoMapperClient() {
 
   const { mapRef, mapElementRef, setMapInstanceAndElement, isMapReady, drawingSourceRef } = useOpenLayersMap();
   const { toast } = useToast();
-  const { user, signOut } = useAuth();
+  const { user, isAuthorized, signOut, signInWithGoogle } = useAuth();
 
   const { panels, handlePanelMouseDown, togglePanelCollapse, togglePanelMinimize } = useFloatingPanels({
     layersPanelRef,
@@ -178,11 +178,13 @@ export default function GeoMapperClient() {
     mapElementRef, 
     isMapReady,
     onNewSelection: () => {
+      if (!isAuthorized) return;
       // When a new selection is made, or attributes are shown, ensure the attributes panel is visible.
       if (panels.attributes.isMinimized) {
         togglePanelMinimize('attributes');
       }
-    }
+    },
+    isInteractionAllowed: isAuthorized,
   });
 
   const [isWfsLoading, setIsWfsLoading] = useState(false);
@@ -357,6 +359,11 @@ export default function GeoMapperClient() {
   }, [mapRef, toast]);
 
   const handleAiAction = useCallback((action: MapAssistantOutput) => {
+    if (!isAuthorized) {
+        toast({ description: 'Debe iniciar sesión para usar el asistente.', variant: 'destructive' });
+        return;
+    }
+
     if (action.response) {
       if (/(carg|busc|añad|mostr|quit|elimin|zoom|estilo|tabla|mapa|base|sentinel|landsat|trello)/i.test(action.response) && 
             ![action.layersToAdd, action.layersToAddAsWFS, action.layersToRemove, action.layersToStyle, action.zoomToLayer, action.showTableForLayer, action.setBaseLayer, action.zoomToBoundingBox, action.findSentinel2Footprints, action.findLandsatFootprints, action.fetchOsmForView, action.urlToOpen].some(field => field && (Array.isArray(field) ? field.length > 0 : true))) {
@@ -505,7 +512,7 @@ export default function GeoMapperClient() {
       toast({ description: `Abriendo Trello en una nueva pestaña...` });
     }
 
-  }, [discoveredGeoServerLayers, handleAddGeoServerLayerToMap, handleAddGeoServerLayerAsWFS, toast, layerManagerHook, zoomToBoundingBox, handleChangeBaseLayer, osmDataHook, initialGeoServerUrl]);
+  }, [isAuthorized, discoveredGeoServerLayers, handleAddGeoServerLayerToMap, handleAddGeoServerLayerAsWFS, toast, layerManagerHook, zoomToBoundingBox, handleChangeBaseLayer, osmDataHook, initialGeoServerUrl]);
 
   const handleSearchTrelloCard = useCallback(async (searchTerm: string) => {
     setIsTrelloLoading(true);
@@ -549,13 +556,17 @@ export default function GeoMapperClient() {
             <div className="flex flex-row space-x-1">
                 <TooltipProvider delayDuration={200}>
                     {panelToggleConfigs.map((panelConfig) => {
-                    const panelState = panels[panelConfig.id as keyof typeof panels];
-                    if (!panelState) return null;
+                      if (panelConfig.auth && !isAuthorized) {
+                        return null; // Don't render if auth is required and user is not authorized
+                      }
+                      
+                      const panelState = panels[panelConfig.id as keyof typeof panels];
+                      if (!panelState) return null;
 
-                    const isPanelOpen = !panelState.isMinimized;
-                    const tooltipText = panelConfig.name;
-                    
-                    return (
+                      const isPanelOpen = !panelState.isMinimized;
+                      const tooltipText = panelConfig.name;
+                      
+                      return (
                         <Tooltip key={panelConfig.id}>
                         <TooltipTrigger asChild>
                             <Button
@@ -582,19 +593,19 @@ export default function GeoMapperClient() {
                             <p className="text-xs">{tooltipText}</p>
                         </TooltipContent>
                         </Tooltip>
-                    );
+                      );
                     })}
                 </TooltipProvider>
             </div>
             
             <div className="flex items-center space-x-2 pl-2 border-l border-gray-600">
-                {user && (
-                    <>
-                        {user.photoURL && (
-                            <img src={user.photoURL} alt={user.displayName || 'User'} className="h-7 w-7 rounded-full" />
-                        )}
-                        <span className="text-xs font-medium hidden sm:inline">{user.displayName}</span>
-                        <TooltipProvider delayDuration={200}>
+                <TooltipProvider delayDuration={200}>
+                    {user ? (
+                        <>
+                            {user.photoURL && (
+                                <img src={user.photoURL} alt={user.displayName || 'User'} className="h-7 w-7 rounded-full" />
+                            )}
+                            <span className="text-xs font-medium hidden sm:inline">{user.displayName}</span>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button
@@ -610,9 +621,25 @@ export default function GeoMapperClient() {
                                     <p className="text-xs">Cerrar sesión</p>
                                 </TooltipContent>
                             </Tooltip>
-                        </TooltipProvider>
-                    </>
-                )}
+                        </>
+                    ) : (
+                         <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8 bg-blue-600/30 hover:bg-blue-500/50 border-blue-500/50 text-white/90"
+                                    onClick={signInWithGoogle}
+                                >
+                                    <LogIn className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="bg-gray-700 text-white border-gray-600">
+                                <p className="text-xs">Iniciar Sesión con Google</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
+                </TooltipProvider>
             </div>
         </div>
       </header>
@@ -661,7 +688,7 @@ export default function GeoMapperClient() {
             />
         )}
 
-        {panels.tools && !panels.tools.isMinimized && (
+        {isAuthorized && panels.tools && !panels.tools.isMinimized && (
           <ToolsPanel
             panelRef={toolsPanelRef}
             isCollapsed={panels.tools.isCollapsed}
@@ -685,7 +712,7 @@ export default function GeoMapperClient() {
           />
         )}
 
-        {panels.legend && !panels.legend.isMinimized && (
+        {isAuthorized && panels.legend && !panels.legend.isMinimized && (
           <LegendPanel
             panelRef={legendPanelRef}
             isCollapsed={panels.legend.isCollapsed}
@@ -720,7 +747,7 @@ export default function GeoMapperClient() {
           />
         )}
 
-        {panels.attributes && !panels.attributes.isMinimized && (
+        {isAuthorized && panels.attributes && !panels.attributes.isMinimized && (
           <AttributesPanel
             panelRef={attributesPanelRef}
             isCollapsed={panels.attributes.isCollapsed}
@@ -751,7 +778,7 @@ export default function GeoMapperClient() {
             />
         )}
 
-        {panels.gee && !panels.gee.isMinimized && (
+        {isAuthorized && panels.gee && !panels.gee.isMinimized && (
           <GeeProcessingPanel
             panelRef={geePanelRef}
             isCollapsed={panels.gee.isCollapsed}
@@ -764,7 +791,7 @@ export default function GeoMapperClient() {
           />
         )}
 
-        {panels.ai && !panels.ai.isMinimized && (
+        {isAuthorized && panels.ai && !panels.ai.isMinimized && (
           <AIPanel
             panelRef={aiPanelRef}
             isCollapsed={panels.ai.isCollapsed}
@@ -783,7 +810,7 @@ export default function GeoMapperClient() {
           />
         )}
 
-        {panels.trello && !panels.trello.isMinimized && (
+        {isAuthorized && panels.trello && !panels.trello.isMinimized && (
           <TrelloPanel
             panelRef={trelloPanelRef}
             isCollapsed={panels.trello.isCollapsed}
@@ -796,7 +823,7 @@ export default function GeoMapperClient() {
           />
         )}
 
-        {panels.wfsLibrary && !panels.wfsLibrary.isMinimized && (
+        {isAuthorized && panels.wfsLibrary && !panels.wfsLibrary.isMinimized && (
           <WfsLibraryPanel
             panelRef={wfsLibraryPanelRef}
             isCollapsed={panels.wfsLibrary.isCollapsed}
@@ -826,5 +853,3 @@ export default function GeoMapperClient() {
     </div>
   );
 }
-
-    
